@@ -1274,7 +1274,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Note handling
     document.getElementById('calcbody').addEventListener('keyup', function(event) {
-        if (event.target.classList.contains('note') && event.target.tagName === 'INPUT') {
+        if (event.target.tagName === 'INPUT' && event.target.hasAttribute('data-subnet')) {
             let delay = 1000;
             clearTimeout(noteTimeout);
             noteTimeout = setTimeout(function(element) {
@@ -1284,7 +1284,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.getElementById('calcbody').addEventListener('focusout', function(event) {
-        if (event.target.classList.contains('note') && event.target.tagName === 'INPUT') {
+        if (event.target.tagName === 'INPUT' && event.target.hasAttribute('data-subnet')) {
             clearTimeout(noteTimeout);
             mutate_subnet_map('note', event.target.dataset.subnet, '', event.target.value);
         }
