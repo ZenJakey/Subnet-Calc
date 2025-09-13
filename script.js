@@ -27,7 +27,7 @@ const minSubnetSizes = {
 
 // IPv6 specific configurations
 const ipv6MinSubnetSizes = {
-    Standard: 128,
+    Standard: 64,
     AZURE: 64,
     AWS: 64,
     OCI: 64,
@@ -860,13 +860,27 @@ function importConfig(text) {
         var [subnetNet, subnetSize] = text['base_network'].split('/');
     }
     
-    // Set IP version
+    // Set IP version first
     if (text['ip_version']) {
         currentIPVersion = text['ip_version'];
         document.querySelector('input[name="ip_version"][value="' + currentIPVersion + '"]').checked = true;
-        // Trigger change event
-        let event = new Event('change');
-        document.querySelector('input[name="ip_version"]').dispatchEvent(event);
+        
+        // Update UI elements for IP version without triggering the change event
+        if (currentIPVersion === 'ipv4') {
+            document.getElementById('ipv4_inputs').classList.remove('d-none');
+            document.getElementById('ipv6_inputs').classList.add('d-none');
+            document.getElementById('network_ipv4').required = true;
+            document.getElementById('network_ipv6').required = false;
+            document.getElementById('netsize').pattern = '^([0-9]|[12][0-9]|3[0-2])$';
+            document.getElementById('netsize').max = '32';
+        } else {
+            document.getElementById('ipv4_inputs').classList.add('d-none');
+            document.getElementById('ipv6_inputs').classList.remove('d-none');
+            document.getElementById('network_ipv4').required = false;
+            document.getElementById('network_ipv6').required = true;
+            document.getElementById('netsize').pattern = '^([0-9]|[1-9][0-9]|1[0-2][0-8])$';
+            document.getElementById('netsize').max = '128';
+        }
     }
     
     if (currentIPVersion === 'ipv4') {
@@ -1141,7 +1155,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Copy URL
     document.getElementById('copy_url').addEventListener('click', function() {
-        let url = window.location.origin + getConfigUrl();
+        // Get the base URL including repository path for GitHub Pages
+        let baseUrl = window.location.origin;
+        let pathname = window.location.pathname;
+        
+        // If we're on GitHub Pages and not at the root, include the repository path
+        if (pathname && pathname !== '/' && pathname !== '/index.html') {
+            // Remove the filename (index.html) if present
+            let pathParts = pathname.split('/');
+            if (pathParts[pathParts.length - 1] === 'index.html') {
+                pathParts.pop();
+            }
+            baseUrl += pathParts.join('/');
+        }
+        
+        let url = baseUrl + getConfigUrl();
         navigator.clipboard.writeText(url);
         document.querySelector('#copy_url span').textContent = 'Copied!';
         setTimeout(function(){
