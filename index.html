@@ -56,6 +56,12 @@
         <div class="font-monospace col-lg-2 col-md-3 col-4 d-none" id="ipv6_inputs">
             <div><label for="network_ipv6" class="form-label mb-0 ms-1">Network Address</label></div>
             <div><input data-bs-toggle="tooltip" data-bs-placement="top" data-bs-custom-class="custom-tooltip" data-bs-title="Error" data-bs-trigger="manual" name="network_ipv6" id="network_ipv6" type="text" class="form-control" value="2001:db8::" aria-label="IPv6 Network Address" pattern="^[0-9a-fA-F:]+$" required></div>
+            <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="nibble_split" name="nibble_split" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="Split IPv6 networks by 4-bit increments (nibbles) instead of single bits. Creates 16 subnets per split instead of 2.">
+                <label class="form-check-label" for="nibble_split">
+                    Nibble Split (4-bit)
+                </label>
+            </div>
         </div>
         
         <div class="font-monospace col-auto">

@@ -9,6 +9,7 @@ let previousOperatingMode = 'Standard';
 let urlVersion = '1';
 let configVersion = '2';
 let currentIPVersion = 'ipv4';
+let nibbleSplitEnabled = false;
 
 // Operating mode configurations
 const netsizePatterns = {
@@ -31,6 +32,14 @@ const ipv6MinSubnetSizes = {
     AZURE: 64,
     AWS: 64,
     OCI: 64,
+};
+
+// IPv6 nibble split minimum sizes (4 bits smaller than regular minimum)
+const ipv6NibbleMinSubnetSizes = {
+    Standard: 68,
+    AZURE: 68,
+    AWS: 68,
+    OCI: 68,
 };
 
 // IPv4 Helper Functions
@@ -173,6 +182,24 @@ function ipv6SplitNetwork(networkInput, netSize) {
     let subnets = [networkInput + '/' + (netSize + 1)];
     let newSubnet = ipv6ToBigInt(networkInput) + (BigInt(2) ** BigInt(128 - netSize - 1));
     subnets.push(bigIntToIPv6(newSubnet) + '/' + (netSize + 1));
+    return subnets;
+}
+
+function ipv6SplitNetworkNibble(networkInput, netSize) {
+    // Split by 4-bit increments (nibbles) instead of single bits
+    let nibbleIncrement = 4;
+    let newNetSize = netSize + nibbleIncrement;
+    
+    // Create 16 subnets (2^4 = 16) for each nibble split
+    let subnets = [];
+    let baseAddress = ipv6ToBigInt(networkInput);
+    let subnetSize = BigInt(2) ** BigInt(128 - newNetSize);
+    
+    for (let i = 0; i < 16; i++) {
+        let subnetAddress = baseAddress + (BigInt(i) * subnetSize);
+        subnets.push(bigIntToIPv6(subnetAddress) + '/' + newNetSize);
+    }
+    
     return subnets;
 }
 
@@ -629,13 +656,25 @@ function mutate_subnet_map(verb, network, subnetTree, propValue = '') {
     let netSize = parseInt(netSplit[1]);
     
     if (verb === 'split') {
-        let minSize = currentIPVersion === 'ipv4' ? minSubnetSizes[operatingMode] : ipv6MinSubnetSizes[operatingMode];
+        let minSize;
+        if (currentIPVersion === 'ipv4') {
+            minSize = minSubnetSizes[operatingMode];
+        } else {
+            // Use nibble minimum size if nibble split is enabled
+            minSize = nibbleSplitEnabled ? ipv6NibbleMinSubnetSizes[operatingMode] : ipv6MinSubnetSizes[operatingMode];
+        }
+        
         if (netSize < minSize) {
             let new_networks;
             if (currentIPVersion === 'ipv4') {
                 new_networks = ipv4SplitNetwork(netSplit[0], netSize);
             } else {
-                new_networks = ipv6SplitNetwork(netSplit[0], netSize);
+                // Check if nibble split is enabled for IPv6
+                if (nibbleSplitEnabled) {
+                    new_networks = ipv6SplitNetworkNibble(netSplit[0], netSize);
+                } else {
+                    new_networks = ipv6SplitNetwork(netSplit[0], netSize);
+                }
             }
             
             // Clear the current node and add children
@@ -645,13 +684,16 @@ function mutate_subnet_map(verb, network, subnetTree, propValue = '') {
                 }
             });
             
-            targetNode[new_networks[0]] = {};
-            targetNode[new_networks[1]] = {};
+            // Add all new networks (2 for regular split, 16 for nibble split)
+            new_networks.forEach(network => {
+                targetNode[network] = {};
+            });
             
             // Copy properties to children
             if (targetNode.hasOwnProperty('_note')) {
-                targetNode[new_networks[0]]['_note'] = targetNode['_note'];
-                targetNode[new_networks[1]]['_note'] = targetNode['_note'];
+                new_networks.forEach(network => {
+                    targetNode[network]['_note'] = targetNode['_note'];
+                });
                 delete targetNode['_note'];
             }
         } else {
@@ -696,7 +738,14 @@ function switchMode(operatingMode) {
     let isSwitched = true;
     
     if (subnetMap !== null) {
-        let minSize = currentIPVersion === 'ipv4' ? minSubnetSizes[operatingMode] : ipv6MinSubnetSizes[operatingMode];
+        let minSize;
+        if (currentIPVersion === 'ipv4') {
+            minSize = minSubnetSizes[operatingMode];
+        } else {
+            // Use nibble minimum size if nibble split is enabled
+            minSize = nibbleSplitEnabled ? ipv6NibbleMinSubnetSizes[operatingMode] : ipv6MinSubnetSizes[operatingMode];
+        }
+        
         if (validateSubnetSizes(subnetMap, minSize)) {
             renderTable(operatingMode);
             set_usable_ips_title(operatingMode);
@@ -763,22 +812,25 @@ function exportConfig(isMinified = true) {
     if (isMinified) {
         minifySubnetMap(miniSubnetMap, subnetMap, baseNetwork);
     }
+    
+    let config = {
+        'config_version': configVersion,
+        'ip_version': currentIPVersion,
+        'base_network': baseNetwork,
+        'subnets': isMinified ? miniSubnetMap : subnetMap,
+    };
+    
+    // Add operating mode if not Standard
     if (operatingMode !== 'Standard') {
-        return {
-            'config_version': configVersion,
-            'ip_version': currentIPVersion,
-            'operating_mode': operatingMode,
-            'base_network': baseNetwork,
-            'subnets': isMinified ? miniSubnetMap : subnetMap,
-        };
-    } else {
-        return {
-            'config_version': configVersion,
-            'ip_version': currentIPVersion,
-            'base_network': baseNetwork,
-            'subnets': isMinified ? miniSubnetMap : subnetMap,
-        };
+        config['operating_mode'] = operatingMode;
     }
+    
+    // Add nibble split state if enabled
+    if (nibbleSplitEnabled) {
+        config['nibble_split'] = nibbleSplitEnabled;
+    }
+    
+    return config;
 }
 
 function getConfigUrl() {
@@ -788,6 +840,9 @@ function getConfigUrl() {
     renameKey(defaultExport, 'base_network', 'b');
     if (defaultExport.hasOwnProperty('operating_mode')) {
         renameKey(defaultExport, 'operating_mode', 'm');
+    }
+    if (defaultExport.hasOwnProperty('nibble_split')) {
+        renameKey(defaultExport, 'nibble_split', 'n');
     }
     renameKey(defaultExport, 'subnets', 's');
     return '/index.html?c=' + urlVersion + encodeURIComponent(JSON.stringify(defaultExport));
@@ -808,6 +863,9 @@ function processConfigUrl() {
             renameKey(urlConfig, 'v', 'config_version');
             if (urlConfig.hasOwnProperty('m')) {
                 renameKey(urlConfig, 'm', 'operating_mode');
+            }
+            if (urlConfig.hasOwnProperty('n')) {
+                renameKey(urlConfig, 'n', 'nibble_split');
             }
             renameKey(urlConfig, 'i', 'ip_version');
             renameKey(urlConfig, 'b', 'base_network');
@@ -892,6 +950,13 @@ function importConfig(text) {
     maxNetSize = subnetSize;
     subnetMap = sortIPCIDRs(text['subnets']);
     operatingMode = text['operating_mode'] || 'Standard';
+    
+    // Set nibble split state if present
+    if (text['nibble_split'] !== undefined) {
+        nibbleSplitEnabled = text['nibble_split'];
+        document.getElementById('nibble_split').checked = nibbleSplitEnabled;
+    }
+    
     switchMode(operatingMode);
 }
 
@@ -1000,6 +1065,18 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('calcbody').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Enter a network address and click Go to start subnetting</td></tr>';
             document.getElementById('input_form').classList.remove('was-validated');
         });
+    });
+
+    // Nibble Split Toggle
+    document.getElementById('nibble_split').addEventListener('change', function() {
+        nibbleSplitEnabled = this.checked;
+        
+        // Clear the subnet map and reset the table when toggling nibble split
+        if (currentIPVersion === 'ipv6' && Object.keys(subnetMap).length > 0) {
+            subnetMap = {};
+            document.getElementById('calcbody').innerHTML = '<tr><td colspan="5" class="text-center text-muted">Enter a network address and click Go to start subnetting</td></tr>';
+            document.getElementById('input_form').classList.remove('was-validated');
+        }
     });
 
     // Paste handling for IPv4
