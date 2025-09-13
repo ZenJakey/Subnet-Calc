@@ -149,28 +149,37 @@ h1 {
     background-color: #ff6b6b !important;
     color: white !important;
     cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 4px;
-    font-weight: 500;
+    padding: 0.5rem !important;
+    border-radius: 4px !important;
+    font-weight: 500 !important;
+    width: 2rem !important;
+    height: 3rem !important;
+    box-sizing: border-box !important;
 }
 
 .join {
     background-color: #4ecdc4 !important;
     color: white !important;
     cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 4px;
-    font-weight: 500;
+    padding: 0.5rem !important;
+    border-radius: 4px !important;
+    font-weight: 500 !important;
+    width: 2rem !important;
+    height: 3rem !important;
+    box-sizing: border-box !important;
 }
 
 .rotate {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    text-align: center;
-    vertical-align: middle;
-    min-width: 2rem;
-    min-height: 3rem;
-    position: relative;
+    writing-mode: vertical-rl !important;
+    text-orientation: mixed !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    min-width: 2rem !important;
+    min-height: 3rem !important;
+    width: 2rem !important;
+    height: 3rem !important;
+    position: relative !important;
+    box-sizing: border-box !important;
 }
 
 .rotate span {
@@ -333,4 +342,22 @@ h1 {
 
 #calc tbody tr {
     animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Prevent animation from affecting button dimensions */
+.split, .join, .rotate {
+    animation: none !important;
+}
+
+/* Ensure button dimensions are preserved after Bootstrap loads */
+table td.split,
+table td.join,
+table td.rotate {
+    width: 2rem !important;
+    height: 3rem !important;
+    min-width: 2rem !important;
+    min-height: 3rem !important;
+    max-width: 2rem !important;
+    max-height: 3rem !important;
+    box-sizing: border-box !important;
 }
